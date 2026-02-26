@@ -58,7 +58,6 @@ public class SimpleServer : IDisposable
                 clientSocket = await _serverSocket.AcceptAsync();
                 _ = Task.Run(async () => await HandleRequestAsync(clientSocket));
             }
-
         }
         catch (Exception ex)
         {
@@ -87,20 +86,35 @@ public class SimpleServer : IDisposable
         }
         else if (requestDto.TypeCommand == TypeCommands.Update)
         {
-            await HandleUpdateAsync(productRepository, requestDto.Body);
+            await HandleUpdateAsync(clientSocket, productRepository, requestDto.Body);
         }
         else if (requestDto.TypeCommand == TypeCommands.Delete)
         {
-            await HandleDeleteAsync(productRepository, requestDto.Body);
+            await HandleDeleteAsync(clientSocket, productRepository, requestDto.Body);
         }
     }
 
     private static async Task HandleGetAllAsync(Socket clientSocket, ProductRepository productRepository, string requestBody)
     {
-        var products = await productRepository.GetAllAsync();
-        var responce = JsonSerializer.Serialize(products);
+        var reponceDto = new ReponceDto
+        {
+            TypeResponce = TypeResponces.OK,
+            Error = string.Empty,
+        };
 
-        await HandlerSendAsync(clientSocket, responce);
+        try
+        {
+            var products = await productRepository.GetAllAsync();
+            reponceDto.Data = JsonSerializer.Serialize(products);
+        }
+        catch (Exception ex)
+        {
+            reponceDto.TypeResponce = TypeResponces.Error;
+            reponceDto.Error = ex.ToString();
+        }
+
+        var reponce = JsonSerializer.Serialize(reponceDto);
+        await HandlerSendAsync(clientSocket, reponce);
     }
 
     private static async Task HandleCreateAsync(Socket clientSocket, ProductRepository productRepository, string requestBody)
@@ -118,27 +132,58 @@ public class SimpleServer : IDisposable
         }
         catch (Exception ex)
         {
-            reponceDto = new ReponceDto
-            {
-                TypeResponce = TypeResponces.Error,
-                Error = ex.ToString(),
-            };
+            reponceDto.TypeResponce = TypeResponces.Error;
+            reponceDto.Error = ex.ToString();
         }
 
         var reponce = JsonSerializer.Serialize(reponceDto);
         await HandlerSendAsync(clientSocket, reponce);
     }
 
-    private static async Task HandleUpdateAsync(ProductRepository productRepository, string requestBody)
+    private static async Task HandleUpdateAsync(Socket clientSocket, ProductRepository productRepository, string requestBody)
     {
-        var product = JsonSerializer.Deserialize<Product>(requestBody);
-        await productRepository.UpdateAsync(product);
+        var reponceDto = new ReponceDto
+        {
+            TypeResponce = TypeResponces.OK,
+            Error = string.Empty,
+        };
+
+        try
+        {
+            var product = JsonSerializer.Deserialize<Product>(requestBody);
+            await productRepository.UpdateAsync(product);
+        }
+        catch (Exception ex)
+        {
+            reponceDto.TypeResponce = TypeResponces.Error;
+            reponceDto.Error = ex.ToString();
+        }
+
+        var reponce = JsonSerializer.Serialize(reponceDto);
+        await HandlerSendAsync(clientSocket, reponce);
     }
 
-    private static async Task HandleDeleteAsync(ProductRepository productRepository, string requestBody)
+    private static async Task HandleDeleteAsync(Socket clientSocket, ProductRepository productRepository, string requestBody)
     {
-        var id = JsonSerializer.Deserialize<int>(requestBody);
-        await productRepository.DeleteAsync(id);
+        var reponceDto = new ReponceDto
+        {
+            TypeResponce = TypeResponces.OK,
+            Error = string.Empty,
+        };
+
+        try
+        {
+            var id = JsonSerializer.Deserialize<int>(requestBody);
+            await productRepository.DeleteAsync(id);
+        }
+        catch (Exception ex)
+        {
+            reponceDto.TypeResponce = TypeResponces.Error;
+            reponceDto.Error = ex.ToString();
+        }
+
+        var reponce = JsonSerializer.Serialize(reponceDto);
+        await HandlerSendAsync(clientSocket, reponce);
     }
 
     private async Task<RequestDto> HandlerReceiveAsync(Socket clientSocket)
